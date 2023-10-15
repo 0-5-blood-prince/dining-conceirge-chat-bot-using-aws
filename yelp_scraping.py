@@ -5,8 +5,8 @@ import datetime
 
 payload = {}
 headers = {
-    'Authorization': 'Bearer xzMcef8MYUiEriWoYhryiXPg7brQw8uBqg0ZrfGiZWUl0Trm701X7lb1a4t15zZ-TY1oW9YkoRXqHawJM6q-QRaapmwsWXu7EAB-49Lf-yk4jIKWKTk0464zBFcqZXYx'
-}
+    'Authorization': 'Bearer {ACCESS_TOKEN}'
+} 
 
 cuisines = ["Chinese", "Indian", "Japanese", "Mexican", "American", "French", "Italian", "Greek", "Korean", "Mediterranean"]
 set_restaurants_data = set()
