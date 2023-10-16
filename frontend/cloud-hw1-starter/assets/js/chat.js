@@ -1,5 +1,9 @@
 var checkout = {};
+function getRandomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
 
+const sessionId = getRandomInt(1, 1000);
 $(document).ready(function() {
   var $messages = $('.messages-content'),
     d, h, m,
@@ -27,11 +31,13 @@ $(document).ready(function() {
 
   function callChatbotApi(message) {
     // params, body, additionalParams
+    console.log(sessionId)
     return sdk.chatbotPost({}, {
       messages: [{
         type: 'unstructured',
         unstructured: {
-          text: message
+          text: message,
+          sessionId: sessionId
         }
       }]
     }, {});

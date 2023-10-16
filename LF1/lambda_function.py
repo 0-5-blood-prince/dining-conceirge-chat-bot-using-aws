@@ -50,13 +50,15 @@ def createDiningSuggestionResponse(intentName, event):
         reservationDate = event['sessionState']['intent']['slots']['reservationDate']['value']['originalValue']
         reservationTime = event['sessionState']['intent']['slots']['reservationTime']['value']['originalValue']
         email = event['sessionState']['intent']['slots']['email']['value']['originalValue']
+        sessionId = event['sessionId']
         requestJSON = {
             "Location" : cityArea,
             "Cuisine" : cuisine,
             "Number of people": numPeople,
             "Reservation Date": reservationDate,
             "Dining Time": reservationTime,
-            "Email": email
+            "Email": email,
+            "sessionId": sessionId
         }
         if sendUserRequestToQueue("https://sqs.us-east-1.amazonaws.com/803282570448/Q1", str(requestJSON)):
             print("Sent to Queue Successfully")

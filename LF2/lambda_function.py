@@ -42,7 +42,6 @@ def send_email(recipient_email, body):
             RawMessage={
                 'Data':msg.as_string(),
             })
-    # Display an error if something goes wrong.
     except ClientError as e:
         print(e.response['Error']['Message'])
     else:
@@ -63,12 +62,16 @@ def lambda_handler(event, context):
         for message in response['Messages']:
             print(message)
             message_data = json.loads(message['Body'].replace("\'", "\""))
+            print(message_data)
             cuisine = message_data['Cuisine']
             email = message_data['Email']
             Reservation_Time = message_data['Dining Time']
             Reservation_Date = message_data['Reservation Date']
             Num_People = message_data['Number of people']
+            sessionId = message_data['sessionId']
             results = query(cuisine)
+            
+                    
             data_list = []
             for result in results:
                 data = lookup_data({'Business ID': result["restaurant"]})
@@ -78,9 +81,60 @@ def lambda_handler(event, context):
             email_message = 'Hello! Here are my {} restaurant suggestions for {} people, for today at {}:\n'.format(cuisine, Num_People, Reservation_Time)
             for i in range(len(data_list)):
                 email_message = email_message + "{}, {}, located at {},\n".format(i+1, data_list[i]["Name"], data_list[i]["Address"])
+            past_recommendations = lookup_data({'sessionId': sessionId},table='recommendations')
+            
+            
+            if past_recommendations:
+                print(past_recommendations)
+                for history in past_recommendations['history']:
+                    if history['location'] == message_data['Location'] and history['cuisine'] == cuisine:
+                        recommendations = history['recommendation']
+                        email_message += "You might want to take a look at your previous restaurant suggestions\n"
+                        j = 0
+                        for recommendation in recommendations:
+                            data = lookup_data({'Business ID': recommendation})
+                            email_message += "{}, {}, located at {},\n".format(j+1,data["Name"], data["Address"] )
+                            j+=1
+                        break
+                    
+                
+                
             send_email(email, email_message)
             
             sqs.delete_message(QueueUrl=queue_url , ReceiptHandle=message['ReceiptHandle'])
+            if sessionId:
+                if past_recommendations:
+                    past_history_list = past_recommendations['history']
+                    a = []
+                    for result in results:
+                        a.append(result["restaurant"])
+                    history = []
+                    history.append({
+                            "location": message_data['Location'],
+                            "cuisine": cuisine,
+                            "recommendation": a
+                        })
+                    history.extend(past_history_list)
+                    recommendation = {
+                        "sessionId": sessionId,
+                        "history": history
+                    }
+                    delete_item({'sessionId': sessionId},table='recommendations')
+                    insert_data([recommendation])
+                else:
+                    a = []
+                    for result in results:
+                        a.append(result["restaurant"])
+                    history =[{
+                        "location": message_data['Location'],
+                            "cuisine": cuisine,
+                            "recommendation": a
+                            }]
+                    recommendation = {
+                        "sessionId": sessionId,
+                        "history": history
+                    }
+                    insert_data([recommendation])
 
 
 def query(term):
@@ -115,7 +169,16 @@ def query(term):
 
     return results
 
-
+def insert_data(data_list, db=None, table='recommendations'):
+    if not db:
+        db = boto3.resource('dynamodb')
+    table = db.Table(table)
+    with table.batch_writer() as batch:
+        # overwrite if the same index is provided
+        for data in data_list:
+            response = table.put_item(Item=data)
+    return response
+    
 def lookup_data(key, db=None, table='yelp-restaurants'):
     if not db:
         db = boto3.resource('dynamodb')
@@ -124,9 +187,25 @@ def lookup_data(key, db=None, table='yelp-restaurants'):
         response = table.get_item(Key=key)
     except ClientError as e:
         print('Error', e.response['Error']['Message'])
+        return None
     else:
-        print(response['Item'])
-        return response['Item']
+        if 'Item' in response:
+            return response['Item']
+        else:
+            return None
+            
+        
+def delete_item(key, db=None, table='yelp-restaurants'):
+    if not db:
+        db = boto3.resource('dynamodb')
+    table = db.Table(table)
+    try:
+        response = table.delete_item(Key=key)
+    except ClientError as e:
+        print('Error', e.response['Error']['Message'])
+    else:
+        print(response)
+        return response
 
 def get_awsauth(region, service):
     cred = boto3.Session().get_credentials()
